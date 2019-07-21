@@ -1,7 +1,7 @@
 import {CxConfig} from '../config'
 import {instance} from './credential'
 import {from, interval} from 'rxjs'
-import {distinctUntilChanged, filter, map, mergeAll, mergeMap} from 'rxjs/operators'
+import {distinctUntilChanged, filter, map, mergeAll, mergeMap, startWith} from 'rxjs/operators'
 import chalk from 'chalk'
 
 export const getLogStreamHead$ = (config: CxConfig, logGroupName: string) => {
@@ -9,6 +9,7 @@ export const getLogStreamHead$ = (config: CxConfig, logGroupName: string) => {
   const {stream = 5000} = polling
 
   return interval(stream).pipe(
+    startWith(0),
     mergeMap(() => from(getHeadLogStream(logGroupName))),
     distinctUntilChanged(),
     map(name => {
@@ -17,16 +18,22 @@ export const getLogStreamHead$ = (config: CxConfig, logGroupName: string) => {
     }),
   )
 }
+
 export const createGetLogEvents$ = (config: CxConfig, logGroupName: string, nextToken?) =>
   (logStreamName: string) => {
     const {event = 3000} = config.polling || {}
     return interval(event).pipe(
+      startWith(0),
       mergeMap(async () => {
           const response = await instance.cwlog
             .getLogEvents({
               logGroupName,
               logStreamName,
               nextToken,
+
+              limit: nextToken
+                ? undefined
+                : 1
             })
             .promise()
           nextToken = response.nextForwardToken
